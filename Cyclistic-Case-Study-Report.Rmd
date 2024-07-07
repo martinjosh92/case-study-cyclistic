@@ -1,0 +1,442 @@
+---
+title: "Case Study: Cyclistic Bike-Share"
+subtitle: "A Data Analysis Report using R Programming Language"
+author: "Josh Martin"
+date: "2024-06-07"
+output: html_document
+---
+
+## Purpose:
+#### **Identify differences in the usage of Cyclistic bikes between casual users and annual members.**
+
+The question I need to answer is: _"How do annual members and casual riders use Cyclistic bikes differently?"_ Cyclistic wants to answer this question as part of their goal to design marketing strategies aimed at converting casual riders into annual members. The company defines "Casual" and "Member" users as such:
+
+**Casual riders:** are customers who puchase single-ride or full day passes.
+
+**Annual members:** are customers who purchase annual memberships.
+
+My initial hypothesis is that customers who purchase annual memberships (Members) are people who use the bikes as a commuting vehicle, while customer who buy single-ride or full day passes (Casual) are people looking to explore the city for leisure. 
+
+_Note: This business case is based on real-world bike-share data from a company called [Divvy](https://divvybikes.com/), located in Chicago, Illinois. I am completing this case study to submit for my Coursera Certificate in Google Data Analytics. Cyclistic is the fictional name given to the company for the purposes of the certificate course_
+
+I'll start by setting up my R environment, loading in the data, and exploring it.
+The following is the code I wrote to import the data. It downloads each zip file, extracts the csv file, and then imports the data into a data frame, excluding columns I won't be using. After this, I use the skimr package to view a data summary of the data set. The whole uncompressed dataset is about 1.2 GB in size, so be sure you have enough memory available if you intend to load it this way.  
+
+```{r setup-and-import-data}
+# load libraries:
+library(tidyverse) 
+library(skimr)
+library(plotly)
+
+# Create a vector of urls to download the files:
+file_urls <-
+  c(
+    "https://divvy-tripdata.s3.amazonaws.com/202306-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202307-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202308-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202309-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202310-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202311-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202312-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202401-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202402-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202403-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202404-divvy-tripdata.zip",
+    "https://divvy-tripdata.s3.amazonaws.com/202405-divvy-tripdata.zip"
+  )
+
+# create an empty dataframe to hold all the data:
+rides <- data.frame()
+# create a temp dataframe that will be used in each iteration of the loop below:
+tempdf <- data.frame()
+
+for(url in file_urls) {
+  # download each zip file into a temp file
+  temp <- tempfile()
+  download.file(url, temp)
+  
+  # each zip file has a csv and a folder, we only want the csv file.
+  # they are named similarly to the zip file
+  filename <- paste(substring(url, 41, 62), "csv", sep = "")
+  
+  # extract the csv file we want from the zip file.
+  temp <- unz(temp, 
+              filename, 
+              open = "", 
+              encoding = getOption("encoding"))
+  
+  # read the csv file into a temporary data frame, only importing columns
+  # that will be used for the remainder of the analysis:
+  tempdf <- read_csv(temp,
+                     col_select = c(
+                       ride_id,
+                       started_at,
+                       ended_at,
+                       member_casual),
+                     show_col_types = FALSE)
+  
+  # add the rows from the temporary dataframe into the main dataframe
+  rides <- rbind(rides, tempdf)
+  
+  # delete the temp file, wipe the temp dataframe
+  unlink(temp)
+  tempdf <- data.frame()
+  
+}
+
+skim(rides)
+```
+
+## Data Cleaning
+
+Several rides are missing start or end station names, and the data set contains a number of rows with missing coordinates for the end of the ride (_end_lat_ and _end_lng_). Some rides are missing station names and/or ids. This can be explained by the nature of the bike share service: not all rides start and/or end at a station. Customers can end a ride on some bikes without bringing the bike back to a dock. I chose not to remove these rows for this reason. 
+
+I added a column for trip duration. I also made separate columns from the ride start times to capture week day, day of month, month, and hour of day for trip departures, to make analysis simpler later on.
+
+I noticed that there are several rides with negative ride durations. I removed these rows as they are clearly errors. I also removed any ride shorter than one minute, as the data source describes rides less than 60 seconds as: _"potentially false starts or users trying to re-dock a bike to ensure it was secure"_ (from https://divvybikes.com/system-data). These made up a very small proportion of the data.
+
+I also identified rides that were excessively long. My assumption is that these rides were actually cases where the ride was not ended when it should have been, either because the customer failed to dock the bike properly or an issue with the bike or dock systems caused the ride to not end properly. I do not believe these ride durations represent actual bike rides and so I removed any ride longer than 12 hours. 
+
+Below, I investigate the distribution of ride durations using a histogram and statistical summaries to come to the conclusion that removing rides longer than 12 hours does not lead to losing valuable data. The first histogram below is "zoomed in" to the lower values on the y axis so that the long "tail" of the distribution is visible. 
+
+The cleaning process is detailed in the code below:
+
+```{r cleaning}
+# Cleaning
+
+# Checking ride_id:
+sum(str_equal(rides$ride_id, "")) # check for empty strings just in case
+# Check that all ride_ids are unique by counting unique ids (should match the 
+# number of rows in the dataset:
+print(paste("Number of unique rides: " , rides %>% 
+  select(ride_id) %>% 
+  unique() %>% 
+  count()))
+print(paste("Total number of rides: " , rides %>% count()))
+
+# Create a ride_duration column to capture how long each ride was:
+rides <- rides %>% 
+  mutate(ride_duration = (as.numeric(ended_at - started_at) / 60))
+
+# remove rides with negative ride duration, and rides shorter than 60 seconds:
+rides <- rides %>% 
+  filter(ride_duration >= 1)
+
+# Use skim to view a summary of ride_duration:
+skim(rides, ride_duration)
+
+# There are some rides that have longer than 24 hour duration, a small
+# percentage. These excessively long rides don't really make any sense and are
+# most likely erroneous. To determine a fair cutoff point, I'll use statistics
+# and look at the histogram of ride durations:
+rides %>% 
+  ggplot(aes(x = ride_duration))+
+  geom_histogram(bins = 300, color = "steelblue")+
+  scale_x_continuous(breaks = seq(min(rides$ride_duration), 
+                                  max(rides$ride_duration), 
+                                  length.out = 40))+
+  coord_cartesian(ylim = c(0,500))+ # zoom in to see the tail more clearly
+  labs(title = "Histogram: Ride Duration Distribution",
+       subtitle = "Zoomed in to see tail of distribution",
+       x = "Ride Duration (seconds)", 
+       y = "Frequency")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+# The above histogram shows a steep drop off in observations in ride duration
+# past a few hours.
+# It's clear that the long duration rides make up a very small proportion of
+# the data, and can be ignored. Keeping or removing them makes little difference
+# to the overall statistics.
+
+# I am going to assume it's safe to remove any ride over 12 hours.
+# I am going to assume that any rides longer than 12 hours was actually someone
+# forgetting to re-dock the bike, and I won't be including these rows.
+# I would also point out that google maps estimates it would take a little over
+# 2 hours to cycle from the northern border of Chicago to the southern border,
+# so rides longer than 12 hours seems unlikely.
+# Also, any ride longer than 3 hours starts to cost extra per minute.
+
+# Count how many rides are longer than 12 hours (how many rows to be removed):
+print(paste("Number of rides longer than 12 hours:", 
+            rides %>% 
+              select(ride_duration) %>% 
+              filter(ride_duration > (60*12)) %>% 
+              count()))
+
+# remove all rides longer than 12 hours:
+rides <- rides %>% 
+  filter(ride_duration < (60*12))
+
+# run that plot again:
+rides %>% 
+  ggplot(aes(x = ride_duration))+
+  geom_histogram(bins = 100)+
+  scale_x_continuous(breaks = seq(min(rides$ride_duration), 
+                                  max(rides$ride_duration), 
+                                  length.out = 10))+
+  scale_y_continuous(labels = scales::comma)+
+  #coord_cartesian(ylim = c(0,100))+
+  labs(title = "Ride Duration Distribution",
+       subtitle = "After removing rides >12 hours",
+       x = "Ride Duration (minutes)", 
+       y = "Frequency")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# This histogram still suggests that I could remove more of the long rides, and 
+# in fact it might make sense to remove rides over 3 hours. I will keep the 12
+# hour limit because I think it's realistic that a small percentage of users
+# actually do ride the bikes for more than 3 hours, and I want them to be
+# represented.
+
+# Summary statistics after removing rides longer than 12 hours:
+skim(rides, ride_duration)
+# Note that the mean hasn't changed much from before removing the 12 hour rides.
+
+# Now I'll add some time columns to make analysis easier:
+rides <- rides %>% 
+  mutate(week_day = wday(rides$started_at)) %>% 
+  mutate(day_of_month = mday(rides$started_at)) %>% 
+  mutate(month = month(rides$started_at)) %>% 
+  mutate(hour_of_day = hour(rides$started_at))
+
+# Arrange the dataset by date:
+rides <- rides %>% 
+  arrange(rides$started_at)
+
+# Make member_casual a labelled factor:
+rides$member_casual <- factor(rides$member_casual, 
+                              levels = c("member", "casual"),
+                              labels = c("Member", "Casual"))
+
+# Make week_day a labelled factor:
+rides$week_day <- factor(rides$week_day,
+                         levels = c(1,2,3,4,5,6,7),
+                         labels = c("Sunday", "Monday", "Tuesday",
+                                    "Wednesday", "Thursday", "Friday",
+                                    "Saturday"))
+# Make month a labelled factor:
+rides$month <- factor(rides$month,
+                      levels = c(1:12),
+                      labels = c("Jan","Feb","Mar","Apr",
+                                 "May","Jun","Jul","Aug",
+                                 "Sep","Oct","Nov","Dec"))
+
+# skim again to verify no NAs exist and see a summary of the dataset:
+skim(rides)
+
+```
+
+The data has been checked for null or missing values, the ride ids have been checked for uniqueness, and rides with excessively long or negative duration have been removed. A few calculated columns have been added to make analysis simpler. The data is now ready for analysis. 
+
+## Analysis
+
+Using different plots of the variables, differences in bike usage were identified between Members and Casual users. 
+
+
+### Both groups exibit seasonal usage differences. 
+
+Lets look at bike usage by month to see how each group uses the bikes during different times of the year:
+
+```{r, plot-monthly, fig.show = 'hold', fig.align='center'}
+# count of rides by month:
+
+m_plot_1 <- rides %>% 
+  group_by(month, member_casual) %>% 
+  count() %>% 
+  ggplot(aes(x = month,
+             y = n,
+             fill = n,
+             text = n))+
+  geom_col()+
+  facet_wrap(~member_casual)+
+  labs(title = "Ride Count by Month",
+       subtitle = "The warmer months are most popular for both groups",
+       caption = "Data from: https://divvybikes.com/system-data",
+       x = "Month", 
+       y = "Number of Rides",
+       fill = "Number of Rides")+
+  scale_y_continuous(labels = scales::comma)+ # format numbers on axis
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_fill_continuous(labels = scales::comma) # format numbers on legend
+ggplotly(m_plot_1, tooltip = "text")
+
+# compare Month and ride duration
+m_plot_2 <- rides %>% 
+  group_by(member_casual, month) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = month, 
+             y = avg_ride_duration,
+             fill = avg_ride_duration,
+             text = paste(month, "avg. ride duration:", avg_ride_duration))) +
+  geom_col()+
+  facet_wrap(~member_casual) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(
+    title = "Average Ride Duration by Month",
+    subtitle = "Members have more consistent ride durations than casual users",
+    caption = "Data from: https://divvybikes.com/system-data",
+    x = "Month",
+    y = "Average ride duration (mins)",
+    fill = "Avg. ride duration (mins)"
+  )
+ggplotly(m_plot_2, tooltip = "text")
+```
+
+The above two charts demonstrate the relationship between time of year and bike usage. The first chart demonstrates the increasing popularity of the bike service during the warmer months for both groups. The second chart shows that Members tend to ride the bikes for the same amount of time regardless of the time of year, while Casual users tend to increase ride duration more significantly during the warmer months.
+
+
+### The day of the week influences bike usage in both member and casual user groups.
+
+Examine the following plots that show how different days of the week influence bike usage for each customer group:
+
+```{r, plot-weekday, fig.show = 'hold', fig.align='center'}
+# count of rides by week day:
+
+wk_plot_1 <- rides %>%
+  group_by(week_day, member_casual) %>% 
+  count() %>% 
+  ggplot(aes(x = week_day,
+             y = n,
+             fill = n,
+             text = paste(week_day, "ride count:", n))) +
+  geom_col() +
+  labs(title = "Ride Count by Weekday", 
+       subtitle = "Casual users use bikes more on the weekend",
+       caption = "Data from: https://divvybikes.com/system-data",
+       x = "Weekday", 
+       y = "Number of Rides",
+       fill = "Number of Rides")+
+  scale_y_continuous(labels = scales::comma)+ # format numbers on axis
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  scale_fill_continuous(labels = scales::comma)+ # format numbers on legend
+  facet_wrap(~member_casual)
+ggplotly(wk_plot_1, tooltip = "text")
+
+# compare week day and ride duration
+
+wk_plot_2 <- rides %>% 
+  group_by(member_casual, week_day) %>% 
+  summarise(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = week_day, 
+             y = avg_ride_duration,
+             fill = avg_ride_duration,
+             text = paste(week_day, "avg. ride duration:", avg_ride_duration)))+
+  geom_col()+
+  facet_wrap(~member_casual) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(
+    title = "Average Ride Duration by Weekday",
+    subtitle = "Member and Casual users compared",
+    caption = "Data from: https://divvybikes.com/system-data",
+    x = "Week day",
+    y = "Average ride duration (mins)",
+    fill = "Avg. ride duration (mins)"
+  )
+ggplotly(wk_plot_2, tooltip = "text")
+```
+
+As can be seen above, Members had a higher usage during the weekdays while Casual users had a higher usage during weekends. This implies that Members use the bikes during the typical Monday through Friday workweek while Casual users use the bikes for leisure on the weekends.
+Also, Members use the bikes with a very consisent ride duration. They are likely using it for commuting, and so their day to day trips are about the same amount of time. Casual users have higher durations overall, and the weekends have longer bike rides for both groups.
+
+
+### Time of day influences both user groups differently and highlights commuting trend.
+
+The below charts examine how both groups use the bikes during different times of the day. 
+
+```{r, plot-time-of-day, fig.show = 'hold', fig.align='center'}
+# count of rides by time of day
+tm_plot_1 <- rides %>% 
+  group_by(hour_of_day, member_casual) %>% 
+  count() %>% 
+  ggplot(aes(x=hour_of_day,
+             y = n,
+             fill = n,
+             text = paste("Count:", n)))+
+  geom_col()+
+  scale_x_continuous("Time of Day", 
+                     breaks = c(2, 6, 10, 14, 18, 22),
+                     labels = c("2AM", "6AM", "10AM", "2PM", "6PM", "10PM"))+
+  scale_y_continuous("Number of rides", 
+                     labels = scales::comma)+
+  scale_fill_continuous(labels = scales::comma)+ # format numbers on legend
+  labs(title = "Bike rides by time of day",
+       subtitle = "Comparision of Members and Casual users",
+       caption = "Data from: https://divvybikes.com/system-data",
+       fill = "Number of rides")+
+  facet_wrap(~member_casual)
+ggplotly(tm_plot_1, tooltip = "text")
+
+# average ride duration for each hour of day:
+tm_plot_2 <- rides %>% 
+  group_by(hour_of_day, member_casual) %>% 
+  summarize(avg_ride_duration = mean(ride_duration)) %>% 
+  ggplot(aes(x = hour_of_day, 
+             y = avg_ride_duration, 
+             fill = avg_ride_duration,
+             text = paste("Avg ride duration:", avg_ride_duration)))+
+  geom_col()+
+  facet_wrap(~member_casual,
+             labeller = labeller())+
+  scale_x_continuous("Time of Day", 
+                     breaks = c(2, 6, 10, 14, 18, 22),
+                     labels = c("2AM", "6AM", "10AM", "2PM", "6PM", "10PM"))+
+  scale_y_continuous("Average ride duration (minutes)")+
+  labs(
+    title = "Average ride duration by time of day",
+    subtitle = "Member and casual riders show differing ride durations by time of day",
+    caption = "Data from: https://divvybikes.com/system-data",
+    fill = "Avg. ride duration (mins)"
+  )
+ggplotly(tm_plot_2, tooltip = "text")
+```
+
+Members tend to ride the bikes more often during peak commuting times, such as 8AM and 5PM. Casual users have usage peaking around 5PM as well, but are more evenly spread throughout the rest of the day.
+Members tend to have consistent ride durations regardless of time of day, while Casual users tend to have longer rides between the hours of 10AM and 2PM. 
+
+
+## Main takeaways:
+
+The purpose of this analysis was to identify differences between the Member and Casual customer groups in an effort to target marketing efforts and convert more Casual users to annual Members. Given more data about each customer (for example, how many rides each customer took) could allow for more in-depth analysis of customer trends.  
+Given the data available, the following are the top three takeaways from my analysis:
+
+### 1. Members tend to use bikes more on weekdays and during commuting hours.
+
+As shown above, Members tend to use the bikes more during rush hour on weekdays (Mon-Fri at 8AM and 5PM). Members also take shorter bike rides that are more consistent length than Casual members, who take longer rides.
+
+### 2. Casual users use bikes more often on weekends and in the afternoon/early evening.
+
+Casual users are more likely to use the bikes for leisure riding on the weekends during midday to early evening. Casual users also take longer bike rides on average overall, especially on the weekends and in the middle of the day.
+
+### 3. July - August is when bikes are used the most by both groups.
+
+The warmer months bring a lot more usage of the bikes by both Members and Casual users, but casual users peak in usage even more noticeably. 
+
+## Next steps and Recommendations
+
+The usage patterns explored above identified that the key difference between the Member and Casual user groups was that *Members seem to use the bikes primarily as a commuting vehicle.*  
+To convert more Casual users into annual Members, the company should target their marketing efforts at Casual users while keeping the following in mind:
+
+1. Casual users who are looking for an alternative to other commuting vehicles or as an alternative to public transit would make an easy conversion. Highlight how flexible and easy using the service is to these people. 
+2. Marketing near bus and train stations would be very effective at converting more customers who wish to use the service for commuting. Point out the time savings the customers could experience as well as the fun of riding a bike. 
+3. The peak season for bike usage is in the warmer months and casual users are primarily using the bikes on the weekends. Emphasize how much more enjoyable it is to explore the city by bike vs. on foot or by car. 
+
+
+## Citations:
+
+__Data source__:  
+  Divvy Bikes _Divvy Bikes is Operated by Lyft Bikes and Scooters, LLC_ Data provided here: https://divvybikes.com/system-data under licence agreement here:  https://divvybikes.com/data-license-agreement
+
+__R__:  
+  R Core Team (2024). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
+
+__RStudio__:  
+  Posit team (2024). RStudio: Integrated Development Environment for R. Posit Software, PBC, Boston, MA. URL http://www.posit.co/.
+
+__tidyverse__ package:  
+  Wickham H, Averick M, Bryan J, Chang W, McGowan LD, Françoi R, Grolemun G, Haye A, Henr L, Heste J, Kuh M, Pederse TL, Mille E, Bach SM, Müll K, Oo ,J, Robins ,D, Seid ,DP, Spi ,V, Takahas ,K, Vaugh ,D, Wil ,C, W ,K, Yutani ,H (2019). “Welcome to the tidyverse.” _Journal of Open Source Software_, *4*(43), 1686. doi:10.21105/joss.01686 <https://doi.org/10.21105/joss.01686>.
+
+__skimr__ package:  
+  Waring E, Quinn M, McNamara A, Arino de la Rubia E, Zhu H, Ellis S (2022). _skimr: Compact and Flexible Summaries of Data_. R package version 2.1.5, <https://CRAN.R-project.org/package=skimr>.
+
+__plotly__ package:
+  C. Sievert. Interactive Web-Based Data Visualization with R, plotly, and shiny. Chapman and Hall/CRC Florida, 2020.
+
