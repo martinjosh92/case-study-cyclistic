@@ -7,20 +7,20 @@ output: html_document
 ---
 
 ## Purpose:
+
 #### **Identify differences in the usage of Cyclistic bikes between casual users and annual members.**
 
-The question I need to answer is: _"How do annual members and casual riders use Cyclistic bikes differently?"_ Cyclistic wants to answer this question as part of their goal to design marketing strategies aimed at converting casual riders into annual members. The company defines "Casual" and "Member" users as such:
+The question I need to answer is: *"How do annual members and casual riders use Cyclistic bikes differently?"* Cyclistic wants to answer this question as part of their goal to design marketing strategies aimed at converting casual riders into annual members. The company defines "Casual" and "Member" users as such:
 
 **Casual riders:** are customers who puchase single-ride or full day passes.
 
 **Annual members:** are customers who purchase annual memberships.
 
-My initial hypothesis is that customers who purchase annual memberships (Members) are people who use the bikes as a commuting vehicle, while customer who buy single-ride or full day passes (Casual) are people looking to explore the city for leisure. 
+My initial hypothesis is that customers who purchase annual memberships (Members) are people who use the bikes as a commuting vehicle, while customer who buy single-ride or full day passes (Casual) are people looking to explore the city for leisure.
 
-_Note: This business case is based on real-world bike-share data from a company called [Divvy](https://divvybikes.com/), located in Chicago, Illinois. I am completing this case study to submit for my Coursera Certificate in Google Data Analytics. Cyclistic is the fictional name given to the company for the purposes of the certificate course_
+*Note: This business case is based on real-world bike-share data from a company called [Divvy](https://divvybikes.com/), located in Chicago, Illinois. I am completing this case study to submit for my Coursera Certificate in Google Data Analytics. Cyclistic is the fictional name given to the company for the purposes of the certificate course*
 
-I'll start by setting up my R environment, loading in the data, and exploring it.
-The following is the code I wrote to import the data. It downloads each zip file, extracts the csv file, and then imports the data into a data frame, excluding columns I won't be using. After this, I use the skimr package to view a data summary of the data set. The whole uncompressed dataset is about 1.2 GB in size, so be sure you have enough memory available if you intend to load it this way.  
+I'll start by setting up my R environment, loading in the data, and exploring it. The following is the code I wrote to import the data. It downloads each zip file, extracts the csv file, and then imports the data into a data frame, excluding columns I won't be using. After this, I use the skimr package to view a data summary of the data set. The whole uncompressed dataset is about 1.2 GB in size, so be sure you have enough memory available if you intend to load it this way.
 
 ```{r setup-and-import-data}
 # load libraries:
@@ -89,15 +89,15 @@ skim(rides)
 
 ## Data Cleaning
 
-Several rides are missing start or end station names, and the data set contains a number of rows with missing coordinates for the end of the ride (_end_lat_ and _end_lng_). Some rides are missing station names and/or ids. This can be explained by the nature of the bike share service: not all rides start and/or end at a station. Customers can end a ride on some bikes without bringing the bike back to a dock. I chose not to remove these rows for this reason. 
+Several rides are missing start or end station names, and the data set contains a number of rows with missing coordinates for the end of the ride (*end_lat* and *end_lng*). Some rides are missing station names and/or ids. This can be explained by the nature of the bike share service: not all rides start and/or end at a station. Customers can end a ride on some bikes without bringing the bike back to a dock. I chose not to remove these rows for this reason.
 
 I added a column for trip duration. I also made separate columns from the ride start times to capture week day, day of month, month, and hour of day for trip departures, to make analysis simpler later on.
 
-I noticed that there are several rides with negative ride durations. I removed these rows as they are clearly errors. I also removed any ride shorter than one minute, as the data source describes rides less than 60 seconds as: _"potentially false starts or users trying to re-dock a bike to ensure it was secure"_ (from https://divvybikes.com/system-data). These made up a very small proportion of the data.
+I noticed that there are several rides with negative ride durations. I removed these rows as they are clearly errors. I also removed any ride shorter than one minute, as the data source describes rides less than 60 seconds as: *"potentially false starts or users trying to re-dock a bike to ensure it was secure"* (from <https://divvybikes.com/system-data>). These made up a very small proportion of the data.
 
-I also identified rides that were excessively long. My assumption is that these rides were actually cases where the ride was not ended when it should have been, either because the customer failed to dock the bike properly or an issue with the bike or dock systems caused the ride to not end properly. I do not believe these ride durations represent actual bike rides and so I removed any ride longer than 12 hours. 
+I also identified rides that were excessively long. My assumption is that these rides were actually cases where the ride was not ended when it should have been, either because the customer failed to dock the bike properly or an issue with the bike or dock systems caused the ride to not end properly. I do not believe these ride durations represent actual bike rides and so I removed any ride longer than 12 hours.
 
-Below, I investigate the distribution of ride durations using a histogram and statistical summaries to come to the conclusion that removing rides longer than 12 hours does not lead to losing valuable data. The first histogram below is "zoomed in" to the lower values on the y axis so that the long "tail" of the distribution is visible. 
+Below, I investigate the distribution of ride durations using a histogram and statistical summaries to come to the conclusion that removing rides longer than 12 hours does not lead to losing valuable data. The first histogram below is "zoomed in" to the lower values on the y axis so that the long "tail" of the distribution is visible.
 
 The cleaning process is detailed in the code below:
 
@@ -225,14 +225,13 @@ skim(rides)
 
 ```
 
-The data has been checked for null or missing values, the ride ids have been checked for uniqueness, and rides with excessively long or negative duration have been removed. A few calculated columns have been added to make analysis simpler. The data is now ready for analysis. 
+The data has been checked for null or missing values, the ride ids have been checked for uniqueness, and rides with excessively long or negative duration have been removed. A few calculated columns have been added to make analysis simpler. The data is now ready for analysis.
 
 ## Analysis
 
-Using different plots of the variables, differences in bike usage were identified between Members and Casual users. 
+Using different plots of the variables, differences in bike usage were identified between Members and Casual users.
 
-
-### Both groups exibit seasonal usage differences. 
+### Both groups exhibit seasonal usage differences.
 
 Lets look at bike usage by month to see how each group uses the bikes during different times of the year:
 
@@ -282,7 +281,6 @@ ggplotly(m_plot_2, tooltip = "text")
 ```
 
 The above two charts demonstrate the relationship between time of year and bike usage. The first chart demonstrates the increasing popularity of the bike service during the warmer months for both groups. The second chart shows that Members tend to ride the bikes for the same amount of time regardless of the time of year, while Casual users tend to increase ride duration more significantly during the warmer months.
-
 
 ### The day of the week influences bike usage in both member and casual user groups.
 
@@ -334,13 +332,11 @@ wk_plot_2 <- rides %>%
 ggplotly(wk_plot_2, tooltip = "text")
 ```
 
-As can be seen above, Members had a higher usage during the weekdays while Casual users had a higher usage during weekends. This implies that Members use the bikes during the typical Monday through Friday workweek while Casual users use the bikes for leisure on the weekends.
-Also, Members use the bikes with a very consisent ride duration. They are likely using it for commuting, and so their day to day trips are about the same amount of time. Casual users have higher durations overall, and the weekends have longer bike rides for both groups.
-
+As can be seen above, Members had a higher usage during the weekdays while Casual users had a higher usage during weekends. This implies that Members use the bikes during the typical Monday through Friday workweek while Casual users use the bikes for leisure on the weekends. Also, Members use the bikes with a very consistent ride duration. They are likely using it for commuting, and so their day to day trips are about the same amount of time. Casual users have higher durations overall, and the weekends have longer bike rides for both groups.
 
 ### Time of day influences both user groups differently and highlights commuting trend.
 
-The below charts examine how both groups use the bikes during different times of the day. 
+The below charts examine how both groups use the bikes during different times of the day.
 
 ```{r, plot-time-of-day, fig.show = 'hold', fig.align='center'}
 # count of rides by time of day
@@ -389,13 +385,11 @@ tm_plot_2 <- rides %>%
 ggplotly(tm_plot_2, tooltip = "text")
 ```
 
-Members tend to ride the bikes more often during peak commuting times, such as 8AM and 5PM. Casual users have usage peaking around 5PM as well, but are more evenly spread throughout the rest of the day.
-Members tend to have consistent ride durations regardless of time of day, while Casual users tend to have longer rides between the hours of 10AM and 2PM. 
-
+Members tend to ride the bikes more often during peak commuting times, such as 8AM and 5PM. Casual users have usage peaking around 5PM as well, but are more evenly spread throughout the rest of the day. Members tend to have consistent ride durations regardless of time of day, while Casual users tend to have longer rides between the hours of 10AM and 2PM.
 
 ## Main takeaways:
 
-The purpose of this analysis was to identify differences between the Member and Casual customer groups in an effort to target marketing efforts and convert more Casual users to annual Members. Given more data about each customer (for example, how many rides each customer took) could allow for more in-depth analysis of customer trends.  
+The purpose of this analysis was to identify differences between the Member and Casual customer groups in an effort to target marketing efforts and convert more Casual users to annual Members. Given more data about each customer (for example, how many rides each customer took) could allow for more in-depth analysis of customer trends.\
 Given the data available, the following are the top three takeaways from my analysis:
 
 ### 1. Members tend to use bikes more on weekdays and during commuting hours.
@@ -408,35 +402,32 @@ Casual users are more likely to use the bikes for leisure riding on the weekends
 
 ### 3. July - August is when bikes are used the most by both groups.
 
-The warmer months bring a lot more usage of the bikes by both Members and Casual users, but casual users peak in usage even more noticeably. 
+The warmer months bring a lot more usage of the bikes by both Members and Casual users, but casual users peak in usage even more noticeably.
 
 ## Next steps and Recommendations
 
-The usage patterns explored above identified that the key difference between the Member and Casual user groups was that *Members seem to use the bikes primarily as a commuting vehicle.*  
+The usage patterns explored above identified that the key difference between the Member and Casual user groups was that *Members seem to use the bikes primarily as a commuting vehicle.*\
 To convert more Casual users into annual Members, the company should target their marketing efforts at Casual users while keeping the following in mind:
 
-1. Casual users who are looking for an alternative to other commuting vehicles or as an alternative to public transit would make an easy conversion. Highlight how flexible and easy using the service is to these people. 
-2. Marketing near bus and train stations would be very effective at converting more customers who wish to use the service for commuting. Point out the time savings the customers could experience as well as the fun of riding a bike. 
-3. The peak season for bike usage is in the warmer months and casual users are primarily using the bikes on the weekends. Emphasize how much more enjoyable it is to explore the city by bike vs. on foot or by car. 
-
+1.  Casual users who are looking for an alternative to other commuting vehicles or as an alternative to public transit would make an easy conversion. Highlight how flexible and easy using the service is to these people.
+2.  Marketing near bus and train stations would be very effective at converting more customers who wish to use the service for commuting. Point out the time savings the customers could experience as well as the fun of riding a bike.
+3.  The peak season for bike usage is in the warmer months and casual users are primarily using the bikes on the weekends. Emphasize how much more enjoyable it is to explore the city by bike vs. on foot or by car.
 
 ## Citations:
 
-__Data source__:  
-  Divvy Bikes _Divvy Bikes is Operated by Lyft Bikes and Scooters, LLC_ Data provided here: https://divvybikes.com/system-data under licence agreement here:  https://divvybikes.com/data-license-agreement
+**Data source**:\
+Divvy Bikes *Divvy Bikes is Operated by Lyft Bikes and Scooters, LLC* Data provided here: <https://divvybikes.com/system-data> under licence agreement here: <https://divvybikes.com/data-license-agreement>
 
-__R__:  
-  R Core Team (2024). _R: A Language and Environment for Statistical Computing_. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
+**R**:\
+R Core Team (2024). *R: A Language and Environment for Statistical Computing*. R Foundation for Statistical Computing, Vienna, Austria. <https://www.R-project.org/>.
 
-__RStudio__:  
-  Posit team (2024). RStudio: Integrated Development Environment for R. Posit Software, PBC, Boston, MA. URL http://www.posit.co/.
+**RStudio**:\
+Posit team (2024). RStudio: Integrated Development Environment for R. Posit Software, PBC, Boston, MA. URL <http://www.posit.co/>.
 
-__tidyverse__ package:  
-  Wickham H, Averick M, Bryan J, Chang W, McGowan LD, Françoi R, Grolemun G, Haye A, Henr L, Heste J, Kuh M, Pederse TL, Mille E, Bach SM, Müll K, Oo ,J, Robins ,D, Seid ,DP, Spi ,V, Takahas ,K, Vaugh ,D, Wil ,C, W ,K, Yutani ,H (2019). “Welcome to the tidyverse.” _Journal of Open Source Software_, *4*(43), 1686. doi:10.21105/joss.01686 <https://doi.org/10.21105/joss.01686>.
+**tidyverse** package:\
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, Françoi R, Grolemun G, Haye A, Henr L, Heste J, Kuh M, Pederse TL, Mille E, Bach SM, Müll K, Oo ,J, Robins ,D, Seid ,DP, Spi ,V, Takahas ,K, Vaugh ,D, Wil ,C, W ,K, Yutani ,H (2019). “Welcome to the tidyverse.” *Journal of Open Source Software*, *4*(43), 1686. <doi:10.21105/joss.01686> <https://doi.org/10.21105/joss.01686>.
 
-__skimr__ package:  
-  Waring E, Quinn M, McNamara A, Arino de la Rubia E, Zhu H, Ellis S (2022). _skimr: Compact and Flexible Summaries of Data_. R package version 2.1.5, <https://CRAN.R-project.org/package=skimr>.
+**skimr** package:\
+Waring E, Quinn M, McNamara A, Arino de la Rubia E, Zhu H, Ellis S (2022). *skimr: Compact and Flexible Summaries of Data*. R package version 2.1.5, <https://CRAN.R-project.org/package=skimr>.
 
-__plotly__ package:
-  C. Sievert. Interactive Web-Based Data Visualization with R, plotly, and shiny. Chapman and Hall/CRC Florida, 2020.
-
+**plotly** package: C. Sievert. Interactive Web-Based Data Visualization with R, plotly, and shiny. Chapman and Hall/CRC Florida, 2020.
