@@ -12,7 +12,7 @@ output: html_document
 
 The question I need to answer is: *"How do annual members and casual riders use Cyclistic bikes differently?"* Cyclistic wants to answer this question as part of their goal to design marketing strategies aimed at converting casual riders into annual members. The company defines "Casual" and "Member" users as such:
 
-**Casual riders:** are customers who puchase single-ride or full day passes.
+**Casual riders:** are customers who purchase single-ride or full day passes.
 
 **Annual members:** are customers who purchase annual memberships.
 
@@ -430,4 +430,5 @@ Wickham H, Averick M, Bryan J, Chang W, McGowan LD, Françoi R, Grolemun G, Haye
 **skimr** package:\
 Waring E, Quinn M, McNamara A, Arino de la Rubia E, Zhu H, Ellis S (2022). *skimr: Compact and Flexible Summaries of Data*. R package version 2.1.5, <https://CRAN.R-project.org/package=skimr>.
 
-**plotly** package: C. Sievert. Interactive Web-Based Data Visualization with R, plotly, and shiny. Chapman and Hall/CRC Florida, 2020.
+**plotly** package:\  
+C. Sievert. Interactive Web-Based Data Visualization with R, plotly, and shiny. Chapman and Hall/CRC Florida, 2020.
